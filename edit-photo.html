@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        body {
+            margin: 0;
+        }
+
+        .wrapper {
+            width: 1400px;
+            height: 100vh;
+            margin: 0 auto;
+            display: flex;
+        }
+
+        .left {
+            width: 1000px;
+            height: 700px;
+            border: 1px solid #ccc;
+            background-color: #000;
+            position: relative;
+        }
+
+        .left .mask {
+            width: 0px;
+            height: 0px;
+            border: 1px solid red;
+            box-sizing: border-box;
+
+            position: absolute;
+            left: 0;
+            top: 0;
+            background-color: rgba(255, 255, 255, 0.5);
+            cursor: crosshair;
+            display: none;
+        }
+
+        .left .mask .info {
+            position: absolute;
+            top: 0;
+            left: 0;
+
+        }
+
+        .left .mask .info p {
+            padding: 0;
+            margin: 0;
+            height: 20px;
+            line-height: 20px;
+            font-size: 14px;
+        }
+
+        .left canvas {
+            cursor: crosshair;
+        }
+
+        .right {
+            width: 380px;
+            height: 700px;
+            border: 1px solid #ccc;
+            background-color: #f0f0f0;
+            margin-left: 10px;
+            position: relative;
+            text-align: center;
+        }
+
+        .right .link-download {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 80px;
+            text-align: center;
+            line-height: 40px;
+            cursor: pointer;
+            background-color: #ccc;
+            border-radius: 5px;
+        }
+
+        a {
+            display: block;
+        }
+
+        .right p {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+    </style>
+</head>
+
+<body>
+    <input type="file" id="file">
+    <div class="wrapper">
+        <!-- 左边的图片 -->
+        <div class="left">
+            <canvas id="canvasLeft">左</canvas>
+            <div class="mask" id="mask">
+            </div>
+        </div>
+        <!-- 右边的内容 -->
+        <div class="right">
+            <canvas id="canvasRight">右</canvas>
+            <div class="link-download" id="download"></div>
+            <p>请选择图片区域下载图片</p>
+        </div>
+    </div>
+
+    <script>
+        document.onmousedown = function (e) {
+            e.preventDefault();
+        }
+        let file = document.querySelector("#file");
+
+        function Clip() {
+            this.canvasLeft = document.getElementById("canvasLeft");
+            this.canvasRight = document.getElementById("canvasRight");
+            this.maskElement = document.getElementById("mask");
+            this.downloadElement = document.getElementById("download");
+        }
+        Clip.prototype.initCanvas = function () {
+            this.canvasLeft.width = 1000;
+            this.canvasLeft.height = 700;
+            this.ctxLeft = this.canvasLeft.getContext("2d");
+            this.ctxRight = this.canvasRight.getContext("2d");
+        }
+        Clip.prototype.initLeftPicture = function (src) {
+            var _this = this;
+            var img = new Image();
+            img.src = src;
+            img.onload = function () {
+                _this.ctxLeft.drawImage(
+                    img,
+                    0,
+                    0,
+                    img.width,
+                    img.height,
+
+                    0,
+                    0,
+                    img.width * (7 / 10),
+                    img.height * (7 / 10)
+                )
+            }
+        }
+        Clip.prototype.getPosition = function (pageX, pageY) {
+            return {
+                x: pageX - this.canvasLeft.getBoundingClientRect().left,
+                y: pageY - this.canvasLeft.getBoundingClientRect().top
+            }
+        }
+        Clip.prototype.addMouseEvent = function () {
+            var isMouseDown = false;
+            var _this = this;
+            this.canvasLeft.onmousedown = function (e) {
+                isMouseDown = true;
+                _this.startX = e.pageX;
+                _this.startY = e.pageY;
+                _this.point = _this.getPosition(_this.startX, _this.startY);
+                if (_this.aElement) {
+                    _this.aElement.remove();
+                }
+            }
+            document.onmousemove = function (e) {
+                if (isMouseDown) {
+                    var x = _this.point.x;
+                    var y = _this.point.y;
+                    var width = e.pageX - _this.startX;
+                    var height = e.pageY - _this.startY;
+                    width = width > 380 ? 380 : width;
+                    height = height > 380 ? 380 : height;
+
+                    _this.showMask(x, y, width, height);
+                    _this.showRightCanvas(x, y, width, height);
+                }
+            }
+            this.canvasLeft.onmouseup = function () {
+                isMouseDown = false;
+                _this.saveBigPhoto();
+                _this.saveClipPhoto();
+            }
+
+        }
+        Clip.prototype.showMask = function (x, y, width, height) {
+            this.maskElement.style['display'] = "block";
+            this.maskElement.style['left'] = x + "px";
+            this.maskElement.style['top'] = y + "px";
+            this.maskElement.style['width'] = width + "px";
+            this.maskElement.style['height'] = height + "px";
+        }
+        Clip.prototype.showRightCanvas = function (sx, sy, sw, sh) {
+            let _this = this;
+            this.canvasRight.width = sw;
+            this.canvasRight.height = sh;
+            this.ctxRight.drawImage(
+                this.canvasLeft,
+                sx,
+                sy,
+                sw,
+                sh,
+                0,
+                0,
+                sw,
+                sh
+            );
+        }
+        Clip.prototype.saveBigPhoto = function () {
+            var urlBase64 = this.canvasLeft.toDataURL("image/jpeg", 1);
+            this.aElement = document.createElement("a");
+            this.aElement.innerText = "点击保存大图";
+            this.aElement.setAttribute("href", urlBase64);
+            this.aElement.setAttribute("download", new Date().getTime());
+            this.downloadElement.appendChild(this.aElement);
+        }
+        Clip.prototype.saveClipPhoto = function () {
+            var urlBase64 = this.canvasRight.toDataURL("image/jpeg", 1);
+            this.aElement = document.createElement("a");
+            this.aElement.innerText = "点击保存小图";
+            this.aElement.setAttribute("href", urlBase64);
+            this.aElement.setAttribute("download", new Date().getTime());
+            this.downloadElement.appendChild(this.aElement);
+        }
+
+        let c1 = new Clip();
+        c1.initCanvas();
+
+        file.onchange = function () {
+            c1.initCanvas();
+            let data = this.files[0];
+            let type = data.type;
+            if (type.includes("png") || type.includes("jpeg")) {
+                let fr = new FileReader();
+                fr.readAsDataURL(data);
+                fr.onload = function (e) {
+                    c1.initLeftPicture(e.target.result);
+                    c1.addMouseEvent();
+                }
+            } else {
+                alert("格式错误");
+                file.value = "";
+                return;
+            }
+        }
+    </script>
+</body>
+
+</html>
